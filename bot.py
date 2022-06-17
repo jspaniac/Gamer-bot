@@ -2,15 +2,15 @@ import os, json, random, time
 import discord
 from discord.ext import commands
 
-auth = json.load(open('auth.json'))
 intents = discord.Intents(messages=True, guilds=True, voice_states=True, members=True)
 bot = commands.Bot(command_prefix='!', intents=intents)
 
-# Awake check command
+#----------#
+# COMMANDS #
+#----------#
+
+# Awake check
 awake_check_messages = []
-with open('messages.txt') as messages:
-    lines = messages.readlines()
-    awake_check_messages = [line.rstrip() for line in lines]
 message_odds = 0.8
 @bot.command(name='awake-check', help=("Disconnects all users from the given voice channel " +
                                        "and sends them an appropriate message"))
@@ -32,7 +32,7 @@ async def awake_check(ctx, channel_name):
     except Exception as e:
         print(e)
 
-# Shun command
+# Shun
 @bot.command(name='shun', help="Shuns the given user")
 async def shun(ctx, name):
     try:
@@ -46,17 +46,20 @@ async def shun(ctx, name):
 # SOCIAL CREDIT RELATED #
 #-----------------------#
 
+# Dictionaries to be loaded from files
 user_to_credit = {}
-penalties = {}
+game_to_penalties = {}
 
-# Loads from file
+# Loads external files
 @bot.event
 async def on_ready():
-    with open('database.json') as db:
-        user_to_credit = json.load(db)
-    with open('penalties.json') as db:
-        penalties = json.load(db)
-    print("Bot finished loading!")
+    with open('database.json') as database:
+        user_to_credit = json.load(database)
+    with open('penalties.json') as penalties:
+        game_to_penalties = json.load(penalties)
+    with open('messages.txt') as messages:
+        awake_check_messages = [line.rstrip() for line in messages.readlines()]
+    print("Bot finished loading external files!")
 
 # Saves to file
 @bot.event
@@ -67,11 +70,12 @@ async def close():
 # Game update event
 @bot.event
 async def on_member_update(prev, cur):
-    if cur.activity.name in penalties:
+    if cur.activity.name in game_to_penalties:
         if cur.id not in user_to_credit:
             user_to_credit[cur.id] = 0
         
-        user_to_credit[cur.id] += penalties[cur.activity.name]
+        user_to_credit[cur.id] += game_to_penalties[cur.activity.name]
 
+auth = json.load(open('auth.json'))
 TOKEN = auth['token']
 bot.run(TOKEN)
