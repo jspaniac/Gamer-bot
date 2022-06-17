@@ -59,7 +59,7 @@ async def close():
     with open('database.json', 'w') as db:
         json.dump(user_to_credit, db)
 
-# Game update events
+# Game update event
 @bot.event
 async def on_member_update(prev, cur):
     if cur.activity.name in penalties:
