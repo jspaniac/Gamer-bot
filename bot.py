@@ -47,14 +47,16 @@ async def shun(ctx, name):
 #-----------------------#
 
 user_to_credit = {}
-penalties = {"League of Legends": 50,
-             "Final Fantasy XIV": 10}
+penalties = {}
 
 # Loads from file
 @bot.event
 async def on_ready():
     with open('database.json') as db:
         user_to_credit = json.load(db)
+    with open('penalties.json') as db:
+        penalties = json.load(db)
+    print("Bot finished loading!")
 
 # Saves to file
 @bot.event
