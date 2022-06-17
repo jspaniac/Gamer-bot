@@ -7,8 +7,11 @@ intents = discord.Intents(messages=True, guilds=True, voice_states=True, members
 bot = commands.Bot(command_prefix='!', intents=intents)
 
 # Awake check command
+awake_check_messages = []
+with open('messages.txt') as messages:
+    lines = messages.readlines()
+    awake_check_messages = [line.rstrip() for line in lines]
 message_odds = 0.8
-awake_check_messages = ["Get awake-checked liberal", "Go to bed degenerate"]
 @bot.command(name='awake-check', help=("Disconnects all users from the given voice channel " +
                                        "and sends them an appropriate message"))
 async def awake_check(ctx, channel_name):
