@@ -1,26 +1,46 @@
-import os, json, random, time
+import os, json, random, time, datetime
 import discord
 from discord.ext import commands
 
 intents = discord.Intents(messages=True, guilds=True, voice_states=True, members=True)
-bot = commands.Bot(command_prefix='!', intents=intents)
+bot = commands.Bot(command_prefix='*', intents=intents)
+
+#-----------#
+# CONSTANTS #
+#-----------#
+
+message_odds = 0.7      # Percentage odds of sending a message over a file
+time_min = '20:00'      # Minimum time to flame people for good morning message
+
+#--------------------#
+# Loading from files #
+#--------------------#
+
+# Text messages used for awake_check / sleep stored in messages.txt
+awake_check_messages = []
+with open('messages.txt') as messages:
+    awake_check_messages = [line.rstrip() for line in messages.readlines()]
+
+# User to cringe credit calculated over lifetime stored in database.json
+user_to_credit = {}
+with open('database.json') as database:
+    user_to_credit = json.load(database)
+
+# Word to its associated penalty stored in penalties.json
+word_to_penalty = {}
+with open('penalties.json') as penalties:
+    word_to_penalty = json.load(penalties)
 
 #----------#
 # COMMANDS #
 #----------#
 
 # Awake check
-awake_check_messages = []
-with open('messages.txt') as messages:
-    awake_check_messages = [line.rstrip() for line in messages.readlines()]
-
-message_odds = 0.7
 @bot.command(name='awake-check', help="Disconnects all users from the given voice channel")
 async def awake_check(ctx, channel_name):
     try:
         prefix = get_prefix()
         for member in discord.utils.get(ctx.guild.voice_channels, name=channel_name).members:
-            # Disconnect the given user
             await member.move_to(None)
             await send_message(prefix, ctx.author.nick, member)
     except Exception as e:
@@ -37,7 +57,8 @@ async def sleep(ctx, name):
     except Exception as e:
         print(e)
 
-# HELPER FUNCTIONS for awake_check and sleep
+#====================================================================#
+# Helper functions for awake_check and sleep
 
 # Sends a message to the user containing the given previx and suffix and either:
 #   - an additional message from messages.txt
@@ -59,6 +80,8 @@ async def send_message(prefix, suffix, member):
 def get_prefix():
     return time.strftime("%H:%M:%S", time.localtime()) + ": "
 
+#====================================================================#
+
 # Shun
 @bot.command(name='shun', help="Shuns the given user by nickname")
 async def shun(ctx, name):
@@ -69,16 +92,26 @@ async def shun(ctx, name):
     except Exception as e:
         print(e)
 
+"""
+Currently commented out to see what accumulates naturally
+
+# Scores
+@bot.command(name='scores', help="Prints out user's cringe-scores calculated from proprietary algorithms")
+async def score(ctx):
+    try:
+        for user, credit in user_to_credit.items():
+            member = discord.utils.get(ctx.guild.members, id=user)
+            if member is not None:
+                await ctx.channel.send(member.nick + ": " + str(credit))
+    except Exception as e:
+        print(e)
+"""
+
+
 #-----------------------#
 # SOCIAL CREDIT RELATED #
 #-----------------------#
 
-# Dictionaries to be loaded from files
-user_to_credit = {}
-with open('database.json') as database:
-    user_to_credit = json.load(database)
-
-# Loads external files
 @bot.event
 async def on_ready():
     print("Bot finished loading external files!")
@@ -86,8 +119,25 @@ async def on_ready():
 # Saves database with updated scores
 @bot.event
 async def close():
-    with open('database.json', 'w') as db:
+    with open('database.json', "w") as db:
         json.dump(user_to_credit, db)
+
+# General responses to messages sent as non-commands
+@bot.event
+async def on_message(message):
+    lower = message.content.lower()
+
+    # Flames users for saying "good morning" late at night
+    if "good morning" in lower and time.strftime('%H:%M') > time_min:
+        await message.channel.send("It's " + time.strftime('%H:%M') + "...")
+    
+    # Secretly calculates based on penalties file (temp while working on RNN for)
+    for word, penalty in word_to_penalty.items():
+        if word in lower:
+            user_to_credit[str(message.author.id)] = user_to_credit.get(str(message.author.id), 0) + penalty
+    
+    # Continue processing other commands
+    await bot.process_commands(message)
 
 auth = json.load(open('auth.json'))
 TOKEN = auth['token']
