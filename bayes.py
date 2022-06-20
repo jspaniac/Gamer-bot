@@ -1,4 +1,4 @@
-import numpy as np
+import os, numpy as np
 
 # TODO: Maybe replace with sets
 
@@ -15,16 +15,19 @@ class NaiveBayes():
 
     # Trains the data given a path to a cringe file and a based file
     # Files must be formatted with one message per line
-    def train(self, cringe, based):
-        with open(cringe, 'r') as cringe_file:
+    def train(self, cringe_file, based_file):
+        with open(cringe_file, 'r') as cringe_file:
             for line in cringe_file:
                 self.num_cringe += 1
-                self.process_line(line, self.cringe_wc)
+                self.process_line(line.lower(), self.cringe_wc)
         
-        with open(based, 'r') as based_file:
+        with open(based_file, 'r') as based_file:
             for line in based_file:
                 self.num_based += 1
-                self.process_line(line, self.based_wc)
+                self.process_line(line.lower(), self.based_wc)
+        
+        print(self.num_based)
+        print(self.num_cringe)
 
     # Helper function to reduce some redundancy. Iterates through words
     # in a line, updating given word count map appropriately
@@ -41,12 +44,10 @@ class NaiveBayes():
         based = 0
         
         message_wc = {}
-        self.process_line(message, message_wc)
+        self.process_line(message.lower(), message_wc)
 
-        for word, count in message_wc:
-            cringe += np.log(count * (self.cringe_wc.get(word, 0) + 1) / 
-                                     (self.num_cringe + 2))
-            based += np.log(based * (self.based_wc.get(word, 0) + 1) / 
-                                    (self.num_based + 2))
+        for word, count in message_wc.items():
+            cringe += np.log(count * (self.cringe_wc.get(word, 0) + 1) / (self.num_cringe + 2))
+            based += np.log(count * (self.based_wc.get(word, 0) + 1) / (self.num_based + 2))
 
         return cringe > based
