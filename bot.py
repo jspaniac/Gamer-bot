@@ -1,4 +1,4 @@
-import os, json, random, time, datetime
+import os, json, random, time, datetime, re
 import discord
 from discord.ext import commands
 
@@ -9,8 +9,9 @@ bot = commands.Bot(command_prefix='*', intents=intents)
 # CONSTANTS #
 #-----------#
 
-message_odds = 0.7      # Percentage odds of sending a message over a file
+message_odds = 0.4      # Percentage odds of sending a message over a file
 time_min = '20:00'      # Minimum time to flame people for good morning message
+embed_max = 4096        # Maximum length of embed descriptions
 
 #--------------------#
 # Loading from files #
@@ -42,7 +43,7 @@ async def awake_check(ctx, channel_name):
         prefix = get_prefix()
         for member in discord.utils.get(ctx.guild.voice_channels, name=channel_name).members:
             await member.move_to(None)
-            await send_message(prefix, ctx.author.nick, member)
+            await send_message(prefix, member)
     except Exception as e:
         print(e)
 
@@ -53,7 +54,7 @@ async def sleep(ctx, name):
         member = discord.utils.get(ctx.guild.members, nick=name)
         if  member.voice.channel is not None:
             await member.move_to(None)
-            await send_message(get_prefix(), ctx.author.nick, member)
+            await send_message(get_prefix(), member)
     except Exception as e:
         print(e)
 
@@ -64,14 +65,14 @@ async def sleep(ctx, name):
 #   - an additional message from messages.txt
 #   - an image from ./images
 # randomly chosen
-async def send_message(prefix, suffix, member):
+async def send_message(prefix, member):
     try:
         if random.randrange(0, 1) <= message_odds:
             # Send a message
-            await member.send(content=prefix + random.choice(awake_check_messages) + " - " + suffix)
+            await member.send(content=prefix + random.choice(awake_check_messages))
         else:
             # Send a file
-            await member.send(content=prefix + suffix,
+            await member.send(content=prefix,
                                 file=discord.File('./images/' + random.choice(os.listdir('./images'))))
     except Exception as e:
         print("message")
@@ -89,6 +90,45 @@ async def shun(ctx, name):
         # Moves the user to a "timeout" channel
         (await discord.utils.get(ctx.guild.members, nick=name)
                       .move_to(discord.utils.get(ctx.guild.channels, name='timeout')))
+    except Exception as e:
+        print(e)
+
+# Search
+@bot.command(name='search', help="Searches through previous messages given word/phrase and depth")
+async def search(ctx, word, limit:int=10, author=None):
+    try:
+        messages = await ctx.channel.history(limit=limit).flatten()
+        results = ["[" + msg.author.nick + ": " + str(msg.created_at.date()) + "](" + msg.jump_url + ")" 
+                   for msg in messages if word in msg.content and
+                                          not msg.author.bot and
+                                          msg.jump_url is not None and
+                                          msg.author.nick is not None]
+
+        result_str = ("Nothing found :(" if not results[1::] 
+                                         else "Results for \'" + word + "\' at limit " + str(limit) + ":\n" +
+                                              "\n".join(results[1::]))
+        embed = discord.Embed()
+        embed.description = (result_str if len(result_str) <= embed_max else 
+                             result_str[:result_str[:embed_max].rfind('\n')])
+        await ctx.channel.send(embed=embed)
+    except Exception as e:
+        print(e)
+
+@bot.command(name='export', help="Exports all messages in the channel to a txt file up to a specific depth")
+async def export(ctx, limit:int=200):
+    try:
+        with open('log.txt', 'w') as log:
+            messages = await ctx.channel.history(limit=limit).flatten()
+            results = {re.sub('<[^>]+>', '', msg.content).replace("\n", " ")
+                         .strip() for msg in messages if not msg.author.bot and
+                                                         not msg.content.startswith('!') and
+                                                         not msg.content.startswith('*')}
+            log.write("\n".join(results))
+            log.close()
+            
+            await ctx.channel.send(content=get_prefix() + ctx.channel.name + " log",
+                                   file=discord.File('log.txt'))
+            os.remove('log.txt')
     except Exception as e:
         print(e)
 
